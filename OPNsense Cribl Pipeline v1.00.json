@@ -1,0 +1,167 @@
+{
+  "id": "OPNsense",
+  "conf": {
+    "output": "default",
+    "streamtags": [],
+    "groups": {},
+    "asyncFuncTimeout": 1000,
+    "functions": [
+      {
+        "filter": "true",
+        "conf": {
+          "comment": "OPNsense Parser pipeline v1.00 for Splunk by Aaron Hofer\nSee: https://github.com/AaronHofer/Cribl"
+        },
+        "id": "comment"
+      },
+      {
+        "filter": "true",
+        "conf": {
+          "comment": "This pipeline version parses OPNsense 'filterlog' and 'dhcpd' event types only. For other event types, it should still parse the initial header so you'll still get timestamps and host names, etc. Don't forget to customize the final eval to preserve whatever fields you'd like to keep. "
+        },
+        "id": "comment"
+      },
+      {
+        "filter": "true",
+        "conf": {
+          "comment": "Eval: Default Disabled. This prevents duplicate data that would result. Seems to only affect the Preview window, not actually in Splunk. "
+        },
+        "id": "comment"
+      },
+      {
+        "filter": "true",
+        "conf": {
+          "remove": [
+            "message",
+            "structureddata"
+          ],
+          "keep": [],
+          "add": []
+        },
+        "id": "eval",
+        "disabled": true
+      },
+      {
+        "filter": "true",
+        "conf": {
+          "comment": "MAIN RFC5424 PARSER - Extracts the fields that aren't specific to OPNsense logs."
+        },
+        "id": "comment"
+      },
+      {
+        "filter": "true",
+        "conf": {
+          "mode": "extract",
+          "type": "regex",
+          "srcField": "_raw",
+          "iterations": 100,
+          "overwrite": true,
+          "regex": "/^<(?<pri>\\d{1,3})>(?<version>\\d)\\s(?<timestamp>\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2}))\\s(?<host>[^\\s\\[=]+)\\s(?<appname>[^\\s\\[=]+)\\s(?<procid>[^\\s\\[=]+)\\s(?<MSGID>[^\\s\\[=]+)\\s(?<structureddata>\\[.*?\\]|-)\\s(?<SUBMSG>.*)/"
+        },
+        "id": "serde",
+        "description": "Pre-parser to extract all the standard RFC5424 fields first. "
+      },
+      {
+        "filter": "true",
+        "conf": {
+          "comment": "Now we can pivot off the appname field for additional parsing since different\ntypes of logs have different formats."
+        },
+        "id": "comment"
+      },
+      {
+        "filter": "true",
+        "conf": {
+          "comment": "Parser for: filterlog"
+        },
+        "id": "comment"
+      },
+      {
+        "filter": "appname == 'filterlog'",
+        "conf": {
+          "mode": "extract",
+          "type": "regex",
+          "srcField": "SUBMSG",
+          "iterations": 500,
+          "overwrite": true,
+          "fields": [
+            "clientip",
+            "ident",
+            "user",
+            "timestamp",
+            "request",
+            "status",
+            "bytes"
+          ],
+          "regex": "/^(?<MESSAGE>(?<rule_number>[^,]*),(?<sub_rule>[^,]*),(?<anchor>[^,]*),(?<rule_uid>[^,]*),(?<interface>[^,]*),(?<reason>[^,]*),(?<action>[^,]*),(?<direction>[^,]*),(?<ip_version>[^,]*),(?<tos>[^,]*),(?<ecn>[^,]*),(?<ttl>[^,]*),(?<ip_id>[^,]*),(?<ip_offset>[^,]*),(?<ip_flags>[^,]*),(?<protocol_id>[^,]*),(?<protocol>tcp|udp|icmp),(?<packet_length>[^,]*),(?<src_ip>[^,]+),(?<dest_ip>[^,]+)(?:,(?<src_port>[^,]*),(?<dest_port>[^,]*),(?<data_length>[^,]*)(?:,(?<tcp_flags>[^,]*),(?<tcp_seq>[^,]*),(?<tcp_ack>[^,]*),(?<tcp_window>[^,]*),(?<tcp_urg>[^,]*),(?<tcp_options>[^,]*))?)?(?:,datalength=(?<datalength>.*))?)$/"
+        },
+        "id": "serde",
+        "disabled": false
+      },
+      {
+        "filter": "true",
+        "conf": {
+          "comment": "Parser for: dhcpd"
+        },
+        "id": "comment"
+      },
+      {
+        "filter": "appname == 'dhcpd' ",
+        "conf": {
+          "mode": "extract",
+          "type": "regex",
+          "srcField": "SUBMSG",
+          "iterations": 500,
+          "overwrite": true,
+          "regex": "/^(?<dhcp_type>DHCP(?:REQUEST|ACK|OFFER|DISCOVER))(?: for (?<dhcp_requestor>[\\d.]+)(?: \\((?<dhcp_server>[\\d.]+)\\))?(?: from|)| from| on (?<dhcp_advertise>[\\d.]+) to| on (?<dhcp_accepted>[\\d.]+) to) (?<dhcp_mac>[0-9a-f:]{17})(?: \\((?<dhcp_hostname>[^\\)]+)\\))?(?: via (?<dhcp_interface>\\w+))?$/"
+        },
+        "id": "serde",
+        "disabled": false
+      },
+      {
+        "filter": "true",
+        "conf": {
+          "comment": "Clean up. Remove unwanted fields, modify as you wish. You can also set an index and sourcetype here if you wish."
+        },
+        "id": "comment"
+      },
+      {
+        "filter": "true",
+        "conf": {
+          "add": [
+            {
+              "disabled": true,
+              "name": "index",
+              "value": "'opnsense'"
+            },
+            {
+              "disabled": true,
+              "name": "sourcetype",
+              "value": "''"
+            }
+          ],
+          "keep": [],
+          "remove": [
+            "message",
+            "STRUCTUREDDATA",
+            "TIMESTAMP",
+            "APPNAME",
+            "VERSION",
+            "ttl",
+            "sub_rule",
+            "tos",
+            "ip_id",
+            "ip_offset",
+            "ecn",
+            "anchor",
+            "rule_uid",
+            "SUBMSG",
+            "MESSAGE"
+          ]
+        },
+        "id": "eval",
+        "disabled": false,
+        "final": false
+      }
+    ],
+    "description": ""
+  }
+}
